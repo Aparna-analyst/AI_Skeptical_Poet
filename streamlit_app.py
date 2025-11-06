@@ -27,7 +27,7 @@ with st.sidebar:
     st.divider()
 
     # Fixed model (Option A: llama3-8b-8192)
-    model = "llama3-8b-8192"
+    model = "llama-3.1-8b-instant"
     st.text_input("Model", value=model, disabled=True)
 
     temperature = st.slider("Creativity (temperature)", 0.0, 1.2, 0.6, 0.1)
