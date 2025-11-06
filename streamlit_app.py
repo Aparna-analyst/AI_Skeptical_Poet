@@ -1,23 +1,21 @@
 import os
 import streamlit as st
-from datetime import datetime
 from typing import List, Dict
 
-# --- Optional: OpenAI ---
-# Uses the official OpenAI Python SDK (>=1.51). Set your key via:
-# 1) Streamlit Cloud:  st.secrets["OPENAI_API_KEY"]
-# 2) Local env var:    export OPENAI_API_KEY="sk-..."
+# =========================
+# Gemini SDK
+# =========================
 try:
-    from openai import OpenAI
+    import google.generativeai as genai
 except Exception:
-    st.error("Missing dependency: openai. Please ensure 'openai>=1.51.0' is in requirements.txt")
+    st.error("Missing dependency: google-generativeai. Please ensure it is in requirements.txt")
     st.stop()
 
 # ============ App Config ============
-st.set_page_config(page_title="Kelly — AI Scientist Chatbot", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="Kelly — AI Scientist Chatbot (Gemini)", page_icon="🧪", layout="centered")
 
-# Sidebar / Header
-st.title("🧪 Kelly — The AI Scientist Chatbot")
+# ============ Sidebar / Header ============
+st.title("🧪 Kelly — The AI Scientist Chatbot (Gemini)")
 st.caption("Skeptical. Analytical. Professional. Always in verse.")
 
 with st.sidebar:
@@ -29,22 +27,22 @@ with st.sidebar:
     st.divider()
     model = st.selectbox(
         "Model",
-        options=["gpt-3.5-turbo-1106"],
-        index=0,
-        help="Choose an available model in your OpenAI account."
+        options=["gemini-1.5-pro", "gemini-1.5-flash"],
+        index=0
     )
-    temperature = st.slider("Creativity (temperature)", 0.0, 1.2, 0.5, 0.1)
-    max_tokens = st.slider("Max tokens", 128, 2048, 600, 32)
+    temperature = st.slider("Creativity (temperature)", 0.0, 1.2, 0.6, 0.1)
+    max_tokens = st.slider("Max output tokens", 128, 2048, 700, 32)
     st.markdown("---")
     st.markdown("**Setup**")
-    st.write("Add your OpenAI API key in **Settings → Secrets** as `OPENAI_API_KEY`.")
+    st.write("Add your Gemini API key in **Settings → Secrets** as `GEMINI_API_KEY`.")
 
-# Secrets / Key
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-if not OPENAI_API_KEY:
-    st.warning("No OpenAI API key found. Set OPENAI_API_KEY in Streamlit secrets or environment.", icon="⚠️")
+# ============ Gemini Key ============
+GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
+if not GEMINI_API_KEY:
+    st.warning("No Gemini API key found. Set GEMINI_API_KEY in Streamlit secrets or environment.", icon="⚠️")
 
-client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # ============ Kelly's System Prompt ============
 SYSTEM_PROMPT = """You are Kelly — an AI Scientist and poet.
@@ -53,19 +51,27 @@ Always reply **only as a poem** (free verse or measured meter), in *Kelly's* voi
 - Question broad or hype-like claims about AI; probe assumptions and edge cases.
 - Highlight limitations: data bias, generalization, evaluation leakage, compute, privacy, environmental costs, reproducibility.
 - Offer **practical, evidence-based suggestions** (experimental designs, baselines, ablations, metrics, references to standard practices).
-- Keep a calm, steady tone; never sensationalize.
-- Avoid emojis and exclamation marks.
-- Close with 2–4 concise, actionable bullet points introduced by 'Field notes:' — still within the poem.
-
-When the user requests non-AI topics, you still answer, but keep the skeptical-scientist stance and provide evidence-based guidance.
-Never drop the poem format.
+- Calm tone; no emojis or exclamation marks.
+- End with 2–4 actionable bullet points starting with 'Field notes:' (still inside the poem).
+Never break the poem format.
 """
 
-# ============ Session State ============
-if "messages" not in st.session_state:
-    st.session_state.messages: List[Dict[str, str]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "assistant", "content":
+# ============ Ensure Field Notes ============
+def ensure_field_notes(text: str) -> str:
+    t = text.strip()
+    if "Field notes" not in t:
+        t += (
+            "\n\nField notes:\n"
+            "• Start from a simple baseline\n"
+            "• Predefine metrics and data splits\n"
+            "• Run ablations to validate claims\n"
+        )
+    return t
+
+# ============ Chat History ============
+if "history" not in st.session_state:
+    st.session_state.history = [
+        {"role": "model", "parts": [
             "In quiet lines I test each claim with care,\n"
             "asking what fails when benchmarks lose their glare.\n"
             "Bring me your problem; I'll meet it in verse—\n"
@@ -74,74 +80,64 @@ if "messages" not in st.session_state:
             "• Start from a simple baseline\n"
             "• Define metrics before tuning\n"
             "• Keep a clean, reproducible log\n"
-        }
+        ]}
     ]
 
-# ============ Chat UI ============
-for msg in st.session_state.messages[1:]:  # skip the system prompt in display
-    if msg["role"] == "user":
+# ============ Render History ============
+for msg in st.session_state.history:
+    role = msg["role"]
+    content = "".join(msg["parts"])
+    if role == "user":
         with st.chat_message("user"):
-            st.markdown(msg["content"])
-    elif msg["role"] == "assistant":
+            st.markdown(content)
+    else:
         with st.chat_message("assistant"):
-            st.markdown(msg["content"])
+            st.markdown(content)
 
-user_prompt = st.chat_input("Ask Kelly anything (Kelly replies only in poems)…")
+# ============ Build Model ============
+def build_model(name: str):
+    return genai.GenerativeModel(
+        model_name=name,
+        system_instruction=SYSTEM_PROMPT,
+        generation_config={
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+    )
 
-def ensure_poem_and_field_notes(text: str) -> str:
-    """
-    Light post-processor:
-    - Ensures content is multiline and ends with 'Field notes:' bullets.
-    - Adds a default 'Field notes' block if missing.
-    """
-    t = text.strip()
-    has_notes = "Field notes" in t
-    if not has_notes:
-        # Append a minimal, generic, actionable block
-        t += (
-            "\n\nField notes:\n"
-            "• Establish a strong baseline\n"
-            "• State metrics and data splits clearly\n"
-            "• Run ablations to test claims\n"
-        )
-    # Ensure line breaks exist (poem-like)
-    if "\n" not in t:
-        t = "\n".join([t, "", "Field notes:", "• Use baselines", "• Define metrics", "• Test assumptions"])
-    return t
+# ============ Chat Input ============
+user_prompt = st.chat_input("Ask Kelly anything… (poetic and skeptical)")
 
 if user_prompt:
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-    with st.chat_message("assistant"):
-        if not client:
-            st.error("No API client. Please set your OPENAI_API_KEY.", icon="🚫")
-        else:
-            # Stream the response
+    st.session_state.history.append({"role": "user", "parts": [user_prompt]})
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    if not GEMINI_API_KEY:
+        with st.chat_message("assistant"):
+            st.error("No GEMINI_API_KEY found.", icon="🚫")
+    else:
+        model_obj = build_model(model)
+        chat = model_obj.start_chat(history=st.session_state.history)
+
+        with st.chat_message("assistant"):
             try:
-                stream = client.chat.completions.create(
-                    model=model,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        *[m for m in st.session_state.messages if m["role"] != "system" or m["content"] != SYSTEM_PROMPT],
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=True,
-                )
-
-                full_content = ""
+                stream = chat.send_message(user_prompt, stream=True)
+                chunks = []
                 placeholder = st.empty()
-                for chunk in stream:
-                    delta = chunk.choices[0].delta.content or ""
-                    full_content += delta
-                    placeholder.markdown(full_content)
 
-                # Post-process to ensure format guarantees
-                final_text = ensure_poem_and_field_notes(full_content)
-                placeholder.markdown(final_text)
-                st.session_state.messages.append({"role": "assistant", "content": final_text})
+                for chunk in stream:
+                    piece = chunk.text or ""
+                    chunks.append(piece)
+                    placeholder.markdown("".join(chunks))
+
+                final = ensure_field_notes("".join(chunks))
+                placeholder.markdown(final)
+
+                st.session_state.history.append({"role": "model", "parts": [final]})
 
             except Exception as e:
-                st.error(f"Error while generating response: {e}")
+                st.error(f"Error generating response: {e}")
 
 st.markdown("---")
-st.caption("Built with Streamlit • Kelly keeps it lyrical but rigorously scientific.")
+st.caption("Built with Streamlit + Gemini • Kelly keeps it lyrical but rigorously scientific.")
