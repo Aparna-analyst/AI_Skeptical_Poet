@@ -1,43 +1,50 @@
-# Kelly — The AI Scientist Chatbot (Streamlit)
+# 🧪 Kelly — The AI Scientist Chatbot  
+### Powered by Groq (Llama 3 8B) • Built with Streamlit
 
-Kelly responds **only in poems**. Tone: skeptical, analytical, professional.  
-Each answer questions broad AI claims, surfaces limitations, and closes with **Field notes** (practical, evidence-based steps).
+Kelly is an AI Scientist who responds **only in poems** —  
+skeptical, analytical, and grounded in evidence.  
+Every answer questions assumptions, highlights limitations,  
+and ends with **Field notes**, a set of practical, actionable scientific steps.
 
-## ✨ Features
-- Streamlit chat interface
-- OpenAI Chat Completions (streaming)
-- Strong system prompt guarantees: poem-only, skeptical tone, limitations, and actionable bullets
-- Lightweight post-processor to enforce a 'Field notes' section
+This project uses **Groq’s ultra-fast Llama 3 (8B)** model for real-time inference.
 
-## 🚀 Local Run
-1. Create a virtual environment and install deps:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Set your OpenAI key:
-   ```bash
-   export OPENAI_API_KEY="sk-..."
-   ```
-3. Launch:
-   ```bash
-   streamlit run streamlit_app.py
-   ```
+---
 
-## ☁️ One-Click Deploy (Streamlit Community Cloud)
-1. Push these files to a **public GitHub repo** (e.g., `kelly-ai-scientist-chatbot`).
-2. Go to **share.streamlit.io** → **New app**.
-3. Select your repo/branch and set **Main file path** to `streamlit_app.py`.
-4. In **Advanced settings → Secrets**, add:
-   ```toml
-   OPENAI_API_KEY="sk-..."
-   ```
-5. Click **Deploy**. Your app URL will look like:
-   `https://<your-username>-kelly-ai-scientist-chatbot.streamlit.app`
+## ✅ Features
 
-## 🔧 Configuration
-- Choose model from the sidebar (`gpt-5-thinking`, `gpt-4o`, or `gpt-4.1-mini`).
-- Adjust temperature and max tokens as desired.
+### 🎭 Kelly’s Poetic Scientific Persona
+Kelly always:
+- Writes in poetic form  
+- Uses a skeptical, analytical tone  
+- Questions broad claims about AI  
+- Points out limitations (bias, data issues, generalization, compute, reproducibility)  
+- Gives evidence-based suggestions  
+- Ends with **Field notes** inside the poem  
 
-## 🧪 Guaranteeing the Style
-- The system prompt hard-requires poem-only responses.
-- The app appends a minimal 'Field notes' block if the model forgets to include it.
+### ⚡ Groq-Powered Llama 3  
+- Extremely fast inference  
+- Free-tier friendly  
+- Perfect for hosting on Streamlit Cloud
+
+### 💬 Clean Chat UI (Streamlit)
+- Smooth streaming responses  
+- Session-based conversation  
+- Model parameters adjustable (temperature, max tokens)  
+- Fully deployable on Streamlit Cloud
+
+---
+
+## ✅ Tech Stack
+
+- **Llama 3 8B (Groq API)**
+- **Streamlit** (UI)
+- **Python 3.10+**
+- **groq-python SDK**
+
+---
+
+## ✅ How to Run Locally
+
+### 1. Install dependencies
+```bash
+pip install -r requirements.txt
