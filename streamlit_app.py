@@ -26,7 +26,7 @@ with st.sidebar:
     )
     st.divider()
 
-    # Fixed model (Option A: llama3-8b-8192)
+    # Fixed model (Option A: llama-3.1-8b-instant)
     model = "llama-3.1-8b-instant"
     st.text_input("Model", value=model, disabled=True)
 
