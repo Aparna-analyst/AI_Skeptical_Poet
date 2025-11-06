@@ -30,6 +30,7 @@ with st.sidebar:
     model = st.selectbox(
         "Model",
         options=["gpt-4o-mini", "gpt-4o", "gpt-4.1"],
+        index=0,
         help="Choose an available model in your OpenAI account."
     )
     temperature = st.slider("Creativity (temperature)", 0.0, 1.2, 0.5, 0.1)
