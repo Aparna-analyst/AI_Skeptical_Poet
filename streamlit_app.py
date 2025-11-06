@@ -3,19 +3,19 @@ import streamlit as st
 from typing import List, Dict
 
 # =========================
-# Gemini SDK
+# Groq SDK
 # =========================
 try:
-    import google.generativeai as genai
+    from groq import Groq
 except Exception:
-    st.error("Missing dependency: google-generativeai. Please ensure it is in requirements.txt")
+    st.error("Missing dependency: groq. Please ensure it is in requirements.txt")
     st.stop()
 
 # ============ App Config ============
-st.set_page_config(page_title="Kelly — AI Scientist Chatbot (Gemini)", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="Kelly — AI Scientist (Groq, Llama 3)", page_icon="🧪", layout="centered")
 
-# ============ Sidebar / Header ============
-st.title("🧪 Kelly — The AI Scientist Chatbot (Gemini)")
+# Header
+st.title("🧪 Kelly — The AI Scientist (Groq, Llama 3)")
 st.caption("Skeptical. Analytical. Professional. Always in verse.")
 
 with st.sidebar:
@@ -25,24 +25,24 @@ with st.sidebar:
         "surfacing limitations, and offering **practical, evidence-based suggestions**."
     )
     st.divider()
-    model = st.selectbox(
-        "Model",
-        options=["gemini-1.5-pro", "gemini-1.5-flash"],
-        index=0
-    )
+
+    # Fixed model (Option A: llama3-8b-8192)
+    model = "llama3-8b-8192"
+    st.text_input("Model", value=model, disabled=True)
+
     temperature = st.slider("Creativity (temperature)", 0.0, 1.2, 0.6, 0.1)
-    max_tokens = st.slider("Max output tokens", 128, 2048, 700, 32)
+    max_tokens = st.slider("Max tokens", 128, 4096, 700, 32)
+
     st.markdown("---")
     st.markdown("**Setup**")
-    st.write("Add your Gemini API key in **Settings → Secrets** as `GEMINI_API_KEY`.")
+    st.write("Add your Groq API key in **Settings → Secrets** as `GROQ_API_KEY`.")
 
-# ============ Gemini Key ============
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY", ""))
-if not GEMINI_API_KEY:
-    st.warning("No Gemini API key found. Set GEMINI_API_KEY in Streamlit secrets or environment.", icon="⚠️")
+# ============ Groq API Key ============
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY", ""))
+if not GROQ_API_KEY:
+    st.warning("No Groq API key found. Set GROQ_API_KEY in Streamlit secrets or environment.", icon="⚠️")
 
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 
 # ============ Kelly's System Prompt ============
 SYSTEM_PROMPT = """You are Kelly — an AI Scientist and poet.
@@ -51,27 +51,17 @@ Always reply **only as a poem** (free verse or measured meter), in *Kelly's* voi
 - Question broad or hype-like claims about AI; probe assumptions and edge cases.
 - Highlight limitations: data bias, generalization, evaluation leakage, compute, privacy, environmental costs, reproducibility.
 - Offer **practical, evidence-based suggestions** (experimental designs, baselines, ablations, metrics, references to standard practices).
-- Calm tone; no emojis or exclamation marks.
-- End with 2–4 actionable bullet points starting with 'Field notes:' (still inside the poem).
-Never break the poem format.
+- Keep a calm, steady tone; never sensationalize.
+- Avoid emojis and exclamation marks.
+- Close with 2–4 concise, actionable bullet points introduced by 'Field notes:' — still within the poem.
+Never drop the poem format.
 """
 
-# ============ Ensure Field Notes ============
-def ensure_field_notes(text: str) -> str:
-    t = text.strip()
-    if "Field notes" not in t:
-        t += (
-            "\n\nField notes:\n"
-            "• Start from a simple baseline\n"
-            "• Predefine metrics and data splits\n"
-            "• Run ablations to validate claims\n"
-        )
-    return t
-
-# ============ Chat History ============
-if "history" not in st.session_state:
-    st.session_state.history = [
-        {"role": "model", "parts": [
+# ============ Session State ============
+if "messages" not in st.session_state:
+    st.session_state.messages: List[Dict[str, str]] = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "assistant", "content":
             "In quiet lines I test each claim with care,\n"
             "asking what fails when benchmarks lose their glare.\n"
             "Bring me your problem; I'll meet it in verse—\n"
@@ -80,64 +70,66 @@ if "history" not in st.session_state:
             "• Start from a simple baseline\n"
             "• Define metrics before tuning\n"
             "• Keep a clean, reproducible log\n"
-        ]}
+        }
     ]
 
-# ============ Render History ============
-for msg in st.session_state.history:
-    role = msg["role"]
-    content = "".join(msg["parts"])
-    if role == "user":
+# ============ Chat UI ============
+for msg in st.session_state.messages[1:]:  # skip system prompt
+    if msg["role"] == "user":
         with st.chat_message("user"):
-            st.markdown(content)
-    else:
+            st.markdown(msg["content"])
+    elif msg["role"] == "assistant":
         with st.chat_message("assistant"):
-            st.markdown(content)
+            st.markdown(msg["content"])
 
-# ============ Build Model ============
-def build_model(name: str):
-    return genai.GenerativeModel(
-        model_name=name,
-        system_instruction=SYSTEM_PROMPT,
-        generation_config={
-            "temperature": temperature,
-            "max_output_tokens": max_tokens,
-        }
-    )
+user_prompt = st.chat_input("Ask Kelly anything (Kelly replies only in poems)…")
 
-# ============ Chat Input ============
-user_prompt = st.chat_input("Ask Kelly anything… (poetic and skeptical)")
+# ============ Post-processor ============
+def ensure_poem_and_field_notes(text: str) -> str:
+    t = (text or "").strip()
+    if "Field notes" not in t:
+        t += (
+            "\n\nField notes:\n"
+            "• Establish a strong baseline\n"
+            "• State metrics and data splits clearly\n"
+            "• Run ablations to test claims\n"
+        )
+    return t
 
+# ============ Generation ============
 if user_prompt:
-    st.session_state.history.append({"role": "user", "parts": [user_prompt]})
-    with st.chat_message("user"):
-        st.markdown(user_prompt)
-
-    if not GEMINI_API_KEY:
-        with st.chat_message("assistant"):
-            st.error("No GEMINI_API_KEY found.", icon="🚫")
-    else:
-        model_obj = build_model(model)
-        chat = model_obj.start_chat(history=st.session_state.history)
-
-        with st.chat_message("assistant"):
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("assistant"):
+        if not client:
+            st.error("No API client. Please set your GROQ_API_KEY.", icon="🚫")
+        else:
             try:
-                stream = chat.send_message(user_prompt, stream=True)
-                chunks = []
+                stream = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        *[m for m in st.session_state.messages if m["role"] != "system"],
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    stream=True,
+                )
+
+                full_content = ""
                 placeholder = st.empty()
 
                 for chunk in stream:
-                    piece = chunk.text or ""
-                    chunks.append(piece)
-                    placeholder.markdown("".join(chunks))
+                    delta = chunk.choices[0].delta.content or ""
+                    full_content += delta
+                    placeholder.markdown(full_content)
 
-                final = ensure_field_notes("".join(chunks))
+                final = ensure_poem_and_field_notes(full_content)
                 placeholder.markdown(final)
 
-                st.session_state.history.append({"role": "model", "parts": [final]})
+                st.session_state.messages.append({"role": "assistant", "content": final})
 
             except Exception as e:
                 st.error(f"Error generating response: {e}")
 
 st.markdown("---")
-st.caption("Built with Streamlit + Gemini • Kelly keeps it lyrical but rigorously scientific.")
+st.caption("Built with Streamlit + Groq (Llama 3) • Kelly keeps it lyrical but rigorously scientific.")
