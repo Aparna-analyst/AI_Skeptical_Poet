@@ -29,7 +29,7 @@ with st.sidebar:
     st.divider()
     model = st.selectbox(
         "Model",
-        options=["gpt-4o-mini", "gpt-4o", "gpt-4.1"],
+        options=["gpt-3.5-turbo-1106"],
         index=0,
         help="Choose an available model in your OpenAI account."
     )
