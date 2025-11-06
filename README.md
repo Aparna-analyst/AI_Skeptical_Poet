@@ -1,9 +1,9 @@
 # Kelly — The AI Scientist Chatbot  
-Powered by Groq (Llama 3 8B) • Built with Streamlit
+Powered by Groq (llama-3.1-8b-instant) • Built with Streamlit
 
 Kelly is an AI Scientist who responds only in poems — skeptical, analytical, and grounded in evidence. Every answer questions assumptions, highlights limitations, and ends with “Field notes,” a set of practical, actionable scientific steps.
 
-This project uses Groq’s ultra-fast Llama 3 (8B) model for real-time inference.
+This project uses Groq’s ultra-fast llama-3.1-8b-instant model for real-time inference.
 
 ------------------------------------------------------------
 FEATURES
@@ -32,7 +32,7 @@ TECH STACK
 ------------------------------------------------------------
 
 - Python 3.10+
-- Groq API (llama3-8b-8192)
+- Groq API (llama-3.1-8b-instant)
 - Streamlit
 - groq-python SDK
 
